@@ -1,0 +1,17 @@
+_env:
+    CONFIG_ROOT: /projects/docker/configs/
+    HOST_SELECT: local
+    SAGE_USER: default
+    APP_NAME: SUPERDUPER
+
+main:
+    file: "/opt/${HOST_SELECT}/${SAGE_USER}.XYZ"
+    extends:
+        file: /projects/docker/c2/nodes.yaml
+        service: ${HOST_SELECT}
+        path: host
+    person:
+        first_name: ${SAGE_USER}
+        last_name: ${HOST_SELECT}
+        additional_names:
+            middle_name: ${APP_NAME}

@@ -1,0 +1,26 @@
+local:
+    name: vagrant vm
+    connection: tcp://192.168.59.104:2376
+
+direct:
+    name: direct linux
+    connection: unix:///var/run/docker.sock
+
+linode1:
+    name: docker host1
+    connection: tcp://12.34.45.6:3376
+    cert_path: /projects/docker/configs/hosts/machines/linode1
+    tls: True
+
+linode2:
+    name: docker host2
+    connection: tcp://12.34.45.6:3376
+    cert_path: /projects/docker/configs/hosts/machines/linode1
+    tls: True
+
+swarm:
+    name: swarm
+    swarm: true
+    connection: tcp://12.34.45.6:3376
+    cert_path: /projects/docker/configs/hosts/machines/linode1
+    tls: True

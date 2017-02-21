@@ -1,0 +1,12 @@
+_env:
+  SAGE_USER: user1
+  HOST_SELECT: local
+
+main:
+  extends:
+    -  file: /projects/docker/c2/defaults.yaml
+       service: main
+    -  file: /projects/docker/c2/nodes.yaml
+       service: swarm
+       path: node2
+  MYAPP: ${APP_NAME}
