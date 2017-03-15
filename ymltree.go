@@ -6,6 +6,7 @@ package ymltree
 import (
 	"errors"
 	"fmt"
+	//"github.com/davecgh/go-spew/spew"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -22,8 +23,10 @@ const ENV_REPLACER_SUFFIX = "}"
 type ConfigMap interface {
 	Export() []byte
 	Find(searchPath string) (node interface{})
+	FindDefault(searchPath string, def string) (out string)
 	Select(path string) (ret Map, err error)
 	Templatize(data Map)
+	Dump()
 }
 
 //store yaml data here
@@ -52,30 +55,60 @@ func (me Map) Export() []byte {
 	return out
 }
 
+func templateReplacer(v string, env Map, reg *regexp.Regexp) string {
+	matches := reg.FindAllString(v, -1)
+	for _, match := range matches {
+
+		envKey := strings.Replace(
+			strings.Replace(match, ENV_REPLACER_SUFFIX, "", 1), ENV_REPLACER_PREFIX, "", 1)
+
+		//any environment coming from the OS has precedent over what's configured
+		newVal := os.Getenv(envKey)
+		if newVal == "" && env[envKey] != nil {
+			newVal = env[envKey].(string)
+		}
+		v = strings.Replace(v, match, newVal, -1)
+	}
+
+	return v
+}
+
 //Templatize a configurator.Map object which replaces "${...}" with the value from env[...]
 func (me Map) Templatize(env Map) {
 	reg := regexp.MustCompile(ENV_REPLACER_REGEX)
 	for k, v := range me {
 		if reflect.TypeOf(v).Kind() == reflect.String {
-			matches := reg.FindAllString(v.(string), -1)
-			for _, match := range matches {
-
-				envKey := strings.Replace(
-					strings.Replace(match, ENV_REPLACER_SUFFIX, "", 1), ENV_REPLACER_PREFIX, "", 1)
-
-				if env[envKey] != nil {
-					//any environment coming from the OS has precedent over what's configured
-					newVal := os.Getenv(envKey)
-					if newVal == "" {
-						newVal = env[envKey].(string)
-					}
-					me[k] = strings.Replace(me[k].(string), match, newVal, -1)
-				}
-			}
+			me[k] = templateReplacer(v.(string), env, reg)
 		} else if reflect.TypeOf(v).Kind() == reflect.Map {
 			v.(ConfigMap).Templatize(env)
+		} else if reflect.TypeOf(v).Kind() == reflect.Slice {
+			for idx, item := range v.([]interface{}) {
+				if reflect.TypeOf(item).Kind() == reflect.String {
+					v.([]interface{})[idx] = templateReplacer(item.(string), env, reg)
+				} else if reflect.TypeOf(item).Kind() == reflect.Map {
+					//not tested...
+					item.(Map).Templatize(env)
+				}
+			}
+
 		}
 	}
+}
+
+func (me Map) Dump() {
+
+	fmt.Printf("%s", me.Export())
+	//spew.Dump(me.Export())
+}
+
+func (me Map) FindDefault(searchPath string, def string) (out string) {
+
+	ret := me.Find(searchPath)
+	if ret == nil {
+		return def
+	}
+
+	return ret.(string)
 }
 
 //Find element specified by searchPath in nested Map
@@ -96,10 +129,21 @@ func (me Map) Find(searchPath string) (node interface{}) {
 	return
 }
 
+func addToEnv(m Map) {
+	for k, v := range m {
+		if os.Getenv(k.(string)) == "" {
+			os.Setenv(k.(string), v.(string))
+		}
+	}
+}
+
 //Select and expand the YAML configuration's nested files with environment overrides
 func (me Map) Select(path string) (selmap Map, err error) {
 
 	parentEnv := me.Find("_env")
+	if parentEnv != nil {
+		addToEnv(parentEnv.(Map))
+	}
 
 	elem := me.Find(path)
 	if elem == nil {
@@ -114,6 +158,8 @@ func (me Map) Select(path string) (selmap Map, err error) {
 
 		if parentEnv != nil && reflect.TypeOf(parentEnv).Kind() == reflect.Map {
 			extender.(Map).Templatize(parentEnv.(Map))
+		} else if parentEnv == nil {
+			extender.(Map).Templatize(nil)
 		}
 
 		file := extender.(Map)["file"]
@@ -149,6 +195,9 @@ func (me Map) Select(path string) (selmap Map, err error) {
 		var env map[interface{}]interface{}
 
 		localEnv := fi.Find("_env")
+		if localEnv != nil {
+			addToEnv(localEnv.(Map))
+		}
 
 		if parentEnv != nil && reflect.TypeOf(parentEnv).Kind() == reflect.Map {
 			if localEnv == nil {
