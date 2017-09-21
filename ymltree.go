@@ -24,6 +24,7 @@ type ConfigMap interface {
 	Export() []byte
 	Find(searchPath string) (node interface{})
 	FindDefault(searchPath string, def string) (out string)
+	FindDefaultInt(searchPath string, def int) (out int)
 	Select(path string) (ret Map, err error)
 	Templatize(data Map)
 	Dump()
@@ -99,6 +100,18 @@ func (me Map) Dump() {
 
 	fmt.Printf("%s", me.Export())
 	//spew.Dump(me.Export())
+}
+
+func (me Map) FindDefaultInt(searchPath string, def int) (out int) {
+
+	ret := me.Find(searchPath)
+
+	if ret != nil && reflect.TypeOf(ret).Kind() == reflect.Int {
+		return ret.(int)
+	}
+
+	return def
+
 }
 
 func (me Map) FindDefault(searchPath string, def string) (out string) {
